@@ -122,8 +122,8 @@ if option == "🔍 Single Sample Prediction":
         # 修复3：TumorSize_cm滑块范围修正（原0.0-1.0不合理）
         TumorSize_cm = st.slider(
             "TumorSize_cm (Tumor Size in cm)",
-            min_value=0.5, max_value=8.0, value=3.0, step=0.1,
-            help="Typical range: 0.5-8.0, Mean: 2.0-4.0 (Larger = worse prognosis)"
+            min_value=1.0, max_value=2.0, value=1.0, step=1.0,
+            help="2：≥4cm; 1:<4cm (Larger = worse prognosis)"
         )
 
     with col2:
@@ -642,4 +642,5 @@ st.sidebar.info("""
 # Add refresh button
 if st.sidebar.button("🔄 Refresh Application"):
     st.rerun()
+
 
