@@ -1,0 +1,36 @@
+{
+  "selected_features": [
+    "LODDS",
+    "FIGO_Stage",
+    "TumorSize_cm",
+    "Chemotherapy",
+    "Marital_Status",
+    "Surgery"
+  ],
+  "feature_importance": [
+    {
+      "feature": "LODDS",
+      "importance": 2833.6704450547695
+    },
+    {
+      "feature": "FIGO_Stage",
+      "importance": 2581.8619649894536
+    },
+    {
+      "feature": "TumorSize_cm",
+      "importance": 964.6327723842114
+    },
+    {
+      "feature": "Marital_Status",
+      "importance": 494.30911814048886
+    },
+    {
+      "feature": "Chemotherapy",
+      "importance": 269.750351075083
+    },
+    {
+      "feature": "Surgery",
+      "importance": 259.94692274928093
+    }
+  ]
+}
