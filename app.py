@@ -642,3 +642,4 @@ st.sidebar.info("""
 # Add refresh button
 if st.sidebar.button("🔄 Refresh Application"):
     st.rerun()
+
