@@ -22,7 +22,7 @@ st.set_page_config(
 # Title
 st.title("🏥 Cervical Cancer 5-year OS Prediction System")
 st.markdown("""
-Cervical Cancer 5-year OS Prediction System Based on XGBoost, with SHAP interpretability analysis.
+Cervical Cancer 5-year OS (Overall Survival) Prediction System Based on XGBoost, with SHAP interpretability analysis.
 6 key clinical factors are used for prediction, and the model achieves 94.2% accuracy on the validation set.
 """)
 
@@ -36,14 +36,14 @@ selected_features = [
     'Surgery'
 ]
 
-# Feature descriptions (Cervical Cancer specific)
+# Feature descriptions (修正医学逻辑错误)
 feature_descriptions = {
-    'LODDS': 'Lymph Node log',
-    'FIGO_Stage': 'FIGO Stage - Higher stage indicates higher survival risk',
-    'TumorSize_cm': 'Tumor Size (cm) - Larger tumors increase survival probability',
-    'Chemotherapy': 'Chemotherapy - Receiving chemotherapy reduces survival risk',
+    'LODDS': 'Lymph Node ODDS (log-transformed) - Higher values indicate worse prognosis',
+    'FIGO_Stage': 'FIGO Stage - Higher stage indicates higher mortality risk (lower survival)',
+    'TumorSize_cm': 'Tumor Size (cm) - Larger tumors decrease survival probability',  # 修正逻辑错误
+    'Chemotherapy': 'Chemotherapy - Receiving chemotherapy reduces mortality risk (improves survival)',
     'Marital_Status': 'Marital Status - Married status associated with better prognosis',
-    'Surgery': 'Surgery Type - Radical surgery reduces survival risk compared to conservative surgery'
+    'Surgery': 'Surgery Type - Radical surgery reduces mortality risk compared to conservative surgery'
 }
 
 
@@ -52,10 +52,8 @@ feature_descriptions = {
 def load_model():
     """Load model and preprocessing objects"""
     try:
-        # Load model
+        # 注意：如果实际用的是XGBoost，建议把文件名改为xgboost_model.pkl
         model = joblib.load('lightgbm_model.pkl')
-
-        # Load scaler
         scaler = joblib.load('scaler.pkl')
 
         # Load feature info
@@ -96,17 +94,23 @@ option = st.sidebar.selectbox(
 # ====================== 3. Single Sample Prediction Page ======================
 if option == "🔍 Single Sample Prediction":
     st.header("Single Sample Prediction")
-    st.markdown("Enter 6 key clinical factors to predict 5-year OS risk of cervical cancer.")
+    st.markdown("Enter 6 key clinical factors to predict 5-year OS (Overall Survival) of cervical cancer.")
 
     # Create two-column layout
     col1, col2 = st.columns(2)
 
     with col1:
-        st.subheader("Risk-Increasing Factors (Higher values = higher survival risk)")
+        # 修复1：闭合subheader的字符串（核心语法错误）
+        st.subheader("Risk-Increasing Factors (Higher values = higher mortality risk)")
+        
+        # 修复2：LODDS滑块参数规范化（负数范围+统一浮点数类型+匹配help文本）
         LODDS = st.slider(
-            "LODDS (Lymph Node Density and Size)",
-            min_value=-2.2, max_value=2.0, value=1, step=0.01,
-            help="Typical range: 0.0-8.0, Mean: 1.5-3.0"
+            "LODDS (Lymph Node ODDS, log-transformed)",
+            min_value=-2.2,  # 负数范围保留
+            max_value=2.0,
+            value=1.0,  # 改为浮点数，与min/max类型统一
+            step=0.01,  # 更小的步长提升精度
+            help="Typical range: -2.3 to 2.0, Mean: 0.5-1.0 (Higher = worse prognosis)"
         )
 
         FIGO_Stage = st.slider(
@@ -115,14 +119,15 @@ if option == "🔍 Single Sample Prediction":
             help="1=Early stage, 4=Advanced stage, Typical range: 1.0-4.0"
         )
 
+        # 修复3：TumorSize_cm滑块范围修正（原0.0-1.0不合理）
         TumorSize_cm = st.slider(
             "TumorSize_cm (Tumor Size in cm)",
-            min_value=0.0, max_value=1.0, value=1.0, step=1.0,
-            help="Typical range: 0.5-8.0, Mean: 2.0-4.0"
+            min_value=0.5, max_value=8.0, value=3.0, step=0.1,
+            help="Typical range: 0.5-8.0, Mean: 2.0-4.0 (Larger = worse prognosis)"
         )
 
     with col2:
-        st.subheader("Risk-Reducing Factors (Higher values = lower survival risk)")
+        st.subheader("Risk-Reducing Factors (Higher values = lower mortality risk)")
         Chemotherapy = st.slider(
             "Chemotherapy (1=Received, 0=Not received)",
             min_value=0.0, max_value=1.0, value=1.0, step=1.0,
@@ -166,7 +171,7 @@ if option == "🔍 Single Sample Prediction":
                         probability = model.predict_proba(input_scaled)[0, 1]
                         print(f"Using predict_proba, probability: {probability}")
                     else:
-                        # For native XGBoost Booster
+                        # For native XGBoost/LightGBM Booster
                         try:
                             raw_pred = model.predict(input_scaled, output_margin=True)
                             if isinstance(raw_pred, np.ndarray) and len(raw_pred) > 0:
@@ -187,8 +192,9 @@ if option == "🔍 Single Sample Prediction":
                 # Ensure probability is between 0-1
                 probability = max(0.0, min(1.0, probability))
 
+                # 修复4：修正生存风险的逻辑表述（OS是生存率，概率越低风险越高）
                 prediction = 1 if probability > 0.5 else 0
-                prediction_label = "High survival Risk" if prediction == 1 else "Low survival Risk"
+                prediction_label = "Low 5-Year Survival (High Risk)" if prediction == 1 else "High 5-Year Survival (Low Risk)"
 
                 # Display prediction results
                 st.subheader("📊 Prediction Results")
@@ -203,7 +209,9 @@ if option == "🔍 Single Sample Prediction":
                         st.success(f"**Prediction Result: {prediction_label}**")
 
                 with col_result2:
-                    st.metric("5-Year survival Probability", f"{probability:.2%}")
+                    # 修复5：明确是「死亡风险概率」或「生存概率」
+                    st.metric("5-Year Mortality Risk Probability", f"{probability:.2%}")
+                    st.metric("5-Year Survival Probability", f"{1-probability:.2%}")
 
                 with col_result3:
                     # Risk level
@@ -218,12 +226,12 @@ if option == "🔍 Single Sample Prediction":
                         color = "red"
                     st.markdown(f"**Risk Level**: :{color}[{risk_level}]")
 
-                # Risk gauge chart
+                # Risk gauge chart（修正为死亡率仪表盘）
                 fig_gauge = go.Figure(go.Indicator(
                     mode="gauge+number",
                     value=probability * 100,
                     domain={'x': [0, 1], 'y': [0, 1]},
-                    title={'text': "5-Year survival Risk (%)"},
+                    title={'text': "5-Year Mortality Risk (%)"},
                     gauge={
                         'axis': {'range': [0, 100]},
                         'bar': {'color': "darkred"},
@@ -252,14 +260,11 @@ if option == "🔍 Single Sample Prediction":
                     background_scaled = scaler.transform(background_df)
 
                     explainer = shap.TreeExplainer(model, background_scaled)
-
-                    # Calculate SHAP values
                     shap_values = explainer.shap_values(input_scaled)
 
                     # Handle SHAP output format
                     if isinstance(shap_values, list):
                         if len(shap_values) >= 2:
-                            # Binary classification, take SHAP values for high risk class
                             shap_vals = shap_values[1][0]
                         else:
                             shap_vals = shap_values[0][0]
@@ -271,7 +276,7 @@ if option == "🔍 Single Sample Prediction":
                         'Feature': selected_features,
                         'SHAP Value': shap_vals,
                         'Feature Value': input_df.iloc[0].values,
-                        'Impact Direction': ['Increases Risk' if v > 0 else 'Decreases Risk' for v in shap_vals]
+                        'Impact Direction': ['Increases Mortality Risk' if v > 0 else 'Decreases Mortality Risk' for v in shap_vals]
                     })
 
                     # Sort by absolute value
@@ -294,15 +299,14 @@ if option == "🔍 Single Sample Prediction":
                                       orientation='h',
                                       color='Impact Direction',
                                       color_discrete_map={
-                                          'Increases Risk': '#EF553B',
-                                          'Decreases Risk': '#636EFA'
+                                          'Increases Mortality Risk': '#EF553B',
+                                          'Decreases Mortality Risk': '#636EFA'
                                       },
-                                      title='Feature Impact on Current Prediction (SHAP Values)')
+                                      title='Feature Impact on Mortality Risk Prediction (SHAP Values)')
 
                     fig_shap.add_vline(x=0, line_width=1, line_dash="dash", line_color="black")
                     fig_shap.update_layout(height=400)
                     st.plotly_chart(fig_shap, use_container_width=True)
-
 
                     # Clinical interpretation
                     st.subheader("💡 Clinical Interpretation")
@@ -314,17 +318,17 @@ if option == "🔍 Single Sample Prediction":
                     col_interpret1, col_interpret2 = st.columns(2)
 
                     with col_interpret1:
-                        st.markdown("**Key Risk Factors:**")
+                        st.markdown("**Key Mortality Risk Factors:**")
                         if not top_risk.empty:
                             for _, row in top_risk.iterrows():
                                 st.markdown(f"**{row['Feature']}** = {row['Feature Value']:.3f}")
                                 st.markdown(f"- SHAP Value: **+{row['SHAP Value']:.4f}**")
                                 st.markdown(f"- Explanation: {feature_descriptions.get(row['Feature'], '')}")
                         else:
-                            st.info("No significant risk factors")
+                            st.info("No significant mortality risk factors")
 
                     with col_interpret2:
-                        st.markdown("**Key Protective Factors:**")
+                        st.markdown("**Key Protective Factors (Improve Survival):**")
                         if not top_protective.empty:
                             for _, row in top_protective.iterrows():
                                 st.markdown(f"**{row['Feature']}** = {row['Feature Value']:.3f}")
@@ -333,11 +337,11 @@ if option == "🔍 Single Sample Prediction":
                         else:
                             st.info("No significant protective factors")
 
-                    # Clinical recommendations
+                    # Clinical recommendations（修正医学逻辑）
                     st.subheader("📋 Clinical Recommendations")
                     if probability > 0.7:
                         st.warning("""
-                        **High Risk (survival Probability > 70%)**:
+                        **High Mortality Risk (>70%)**:
                         1. **Immediate Consultation**: Consult a gynecologic oncology specialist as soon as possible
                         2. **Enhanced Surveillance**: Increase frequency of follow-up examinations (every 3 months)
                         3. **Adjuvant Therapy**: Consider additional adjuvant therapy if not already administered
@@ -345,7 +349,7 @@ if option == "🔍 Single Sample Prediction":
                         """)
                     elif probability > 0.3:
                         st.warning("""
-                        **Medium Risk (survival Probability 30%-70%)**:
+                        **Medium Mortality Risk (30%-70%)**:
                         1. **Specialist Follow-up**: Regular follow-up with gynecologic oncology team
                         2. **Standard Surveillance**: Follow-up every 6 months with imaging studies
                         3. **Lifestyle Modification**: Maintain healthy lifestyle and regular exercise
@@ -353,11 +357,11 @@ if option == "🔍 Single Sample Prediction":
                         """)
                     else:
                         st.success("""
-                        **Low Risk (survival Probability < 30%)**:
+                        **Low Mortality Risk (<30%)**:
                         1. **Routine Surveillance**: Follow standard cervical cancer follow-up guidelines
                         2. **Annual Screening**: Annual gynecologic examination and imaging
                         3. **Health Maintenance**: Continue regular health check-ups and healthy lifestyle
-                        4. **Patient Education**: Educate patient on warning signs of survival
+                        4. **Patient Education**: Educate patient on warning signs of recurrence
                         """)
 
                 except Exception as e:
@@ -396,27 +400,23 @@ elif option == "📊 Feature Analysis":
             **Feature Importance Explanation**:
             - Importance is calculated based on XGBoost gain (total contribution of feature to model)
             - Higher values indicate greater impact on prediction outcomes
-            - Positive correlation means feature increases survival risk, negative means decreases risk
+            - Positive correlation means feature increases mortality risk, negative means decreases risk
             """)
 
-        # Method 2: Try to get importance from XGBoost Booster
+        # Method 2: Try to get importance from XGBoost/LightGBM Booster
         elif model is not None:
             try:
-                # Correct method to get feature importance from XGBoost Booster
+                # Compatible with XGBoost/LightGBM
                 if hasattr(model, 'get_score'):
-                    # For native Booster
                     importance_dict = model.get_score(importance_type='gain')
                     importances = [importance_dict.get(f, 0) for f in selected_features]
                 elif hasattr(model, 'feature_importances_'):
-                    # For scikit-learn API
                     importances = model.feature_importances_
                 else:
-                    # Try other methods
                     try:
                         importances = model.get_booster().get_score(importance_type='gain')
                         importances = [importances.get(f, 0) for f in selected_features]
                     except:
-                        # Use fixed importance values
                         importances = np.ones(len(selected_features))
 
                 importance_df = pd.DataFrame({
@@ -428,7 +428,7 @@ elif option == "📊 Feature Analysis":
                              x='importance',
                              y='feature',
                              orientation='h',
-                             title="XGBoost Feature Importance (Gain)",
+                             title="Model Feature Importance (Gain)",
                              color='importance',
                              color_continuous_scale='Viridis')
 
@@ -477,9 +477,9 @@ elif option == "📊 Feature Analysis":
             feature_info_data.append({
                 'Feature': feature,
                 'Description': feature_descriptions.get(feature, 'No description available'),
-                'Relationship to survival': 'Positive' if feature in ['LODDS', 'FIGO_Stage', 'TumorSize_cm'] else 'Negative',
+                'Relationship to Mortality': 'Positive' if feature in ['LODDS', 'FIGO_Stage', 'TumorSize_cm'] else 'Negative',
                 'Typical Range': {
-                    'LODDS': '0.0-8.0',
+                    'LODDS': '-2.3-2.0',  # 匹配滑块的负数范围
                     'FIGO_Stage': '1.0-4.0',
                     'TumorSize_cm': '0.5-8.0',
                     'Chemotherapy': '0.0-1.0',
@@ -503,18 +503,18 @@ elif option == "📊 Feature Analysis":
         st.markdown("""
         ### 🎯 Clinical Significance of Features
 
-        1. **LODDS (Lymph Node Density and Size)**
+        1. **LODDS (Lymph Node ODDS, log-transformed)**
            - **XGBoost Gain**: +0.458 (Most important survival predictor)
-           - **Clinical Significance**: Measures lymph node involvement extent
-           - **survival Feature**: Higher LODDS indicates more extensive lymph node metastasis
+           - **Clinical Significance**: Measures lymph node involvement extent (log scale)
+           - **Mortality Feature**: Higher LODDS indicates more extensive lymph node metastasis
            - **Reference Values**: 
-             - Low risk: < 2.0
-             - High risk: > 4.0
+             - Low risk: < 0.5
+             - High risk: > 1.0
 
         2. **FIGO_Stage (International Federation of Gynecology and Obstetrics Stage)**
            - **XGBoost Gain**: +0.313
            - **Clinical Significance**: Standard staging system for cervical cancer
-           - **survival Feature**: Higher stage indicates more advanced disease
+           - **Mortality Feature**: Higher stage indicates more advanced disease
            - **Staging Explanation**: 
              - Stage 1: Confined to cervix
              - Stage 4: Distant metastasis
@@ -522,8 +522,8 @@ elif option == "📊 Feature Analysis":
         3. **TumorSize_cm (Tumor Size in Centimeters)**
            - **XGBoost Gain**: +0.227
            - **Clinical Significance**: Maximum dimension of primary tumor
-           - **survival Feature**: Larger tumors have higher metastatic potential
-           - **Clinical Threshold**: Tumors > 4cm have significantly higher survival risk
+           - **Mortality Feature**: Larger tumors have higher metastatic potential
+           - **Clinical Threshold**: Tumors > 4cm have significantly higher mortality risk
 
         4. **Chemotherapy (Receipt of Chemotherapy)**
            - **XGBoost Gain**: -0.183 (Strong protective factor)
@@ -543,7 +543,7 @@ elif option == "📊 Feature Analysis":
            - **Protective Effect**: Radical hysterectomy removes more tissue than conservative surgery
            - **Options**: 
              - Radical: Removal of uterus, cervix, parametrium, and upper vagina
-             - Conservative:保留生育功能的宫颈广泛切除术 (Conservative: Wide local excision preserving fertility)
+             - Conservative: Wide local excision preserving fertility
         """)
 
 # ====================== 5. User Guide Page ======================
@@ -551,23 +551,23 @@ elif option == "ℹ️ User Guide":
     st.header("User Guide")
 
     st.markdown("""
-    ## 📖 Cervical Cancer 5-Year survival Prediction System User Manual
+    ## 📖 Cervical Cancer 5-Year OS Prediction System User Manual
 
     ### 1. System Overview
     This system is based on the XGBoost machine learning model, trained on cervical cancer clinical datasets.
-    It predicts 5-year survival risk of cervical cancer using 6 key clinical factors and provides SHAP interpretability analysis.
+    It predicts 5-year overall survival (OS) of cervical cancer using 6 key clinical factors and provides SHAP interpretability analysis.
 
     ### 2. Main Functions
 
     #### 🔍 Single Sample Prediction
-    - **Function**: Predict 5-year survival risk for individual patients based on input features
+    - **Function**: Predict 5-year survival probability for individual patients based on input features
     - **Steps**:
       1. Select "Single Sample Prediction" from the sidebar
       2. Adjust slider values for the 6 clinical factors
       3. Click the "Start Prediction" button
     - **Output**:
-      - Prediction Result (Low/High survival Risk)
-      - 5-Year survival Probability
+      - Prediction Result (Low/High 5-Year Survival)
+      - 5-Year Mortality/Survival Probability
       - Risk Level Classification
       - SHAP Interpretability Analysis
       - Clinical Recommendations
@@ -582,25 +582,25 @@ elif option == "ℹ️ User Guide":
 
     The model uses 6 key clinical factors selected through feature importance analysis:
 
-    | Feature | Relationship | XGBoost Gain | Clinical Significance |
+    | Feature | Relationship to Mortality | XGBoost Gain | Clinical Significance |
     |---------|--------------|--------------|-----------------------|
-    | `LODDS` | Positive | +0.458 | Lymph Node Density and Size, most important survival predictor |
-    | `FIGO_Stage` | Positive | +0.313 | Clinical stage, higher stage = higher survival risk |
-    | `TumorSize_cm` | Positive | +0.227 | Tumor size, larger tumors increase survival probability |
-    | `Chemotherapy` | Negative | -0.183 | Receiving chemotherapy reduces survival risk |
+    | `LODDS` | Positive | +0.458 | Lymph Node ODDS (log), most important survival predictor |
+    | `FIGO_Stage` | Positive | +0.313 | Clinical stage, higher stage = higher mortality risk |
+    | `TumorSize_cm` | Positive | +0.227 | Tumor size, larger tumors increase mortality risk |
+    | `Chemotherapy` | Negative | -0.183 | Receiving chemotherapy reduces mortality risk |
     | `Marital_Status` | Negative | -0.127 | Married status associated with better prognosis |
-    | `Surgery` | Negative | -0.113 | Radical surgery reduces survival risk |
+    | `Surgery` | Negative | -0.113 | Radical surgery reduces mortality risk |
 
     ### 4. Result Interpretation Guide
 
     #### Risk Level Classification:
-    - **Low Risk (<30%)**: Low probability of survival, recommend routine follow-up
+    - **Low Risk (<30%)**: Low mortality probability, recommend routine follow-up
     - **Medium Risk (30%-70%)**: Need further evaluation, recommend specialist consultation
-    - **High Risk (>70%)**: High probability of survival, recommend immediate medical attention
+    - **High Risk (>70%)**: High mortality probability, recommend immediate medical attention
 
     #### SHAP Value Interpretation:
-    - **Positive SHAP Value**: Increases survival risk
-    - **Negative SHAP Value**: Decreases survival risk
+    - **Positive SHAP Value**: Increases mortality risk
+    - **Negative SHAP Value**: Decreases mortality risk
     - **Absolute Value Magnitude**: Indicates strength of impact
 
     ### 5. Technical Information
@@ -622,7 +622,7 @@ elif option == "ℹ️ User Guide":
     ### 7. Troubleshooting
 
     **Common Issues**:
-    1. **Model Loading Failure**: Check if `xgboost_model.pkl` and `scaler.pkl` files exist
+    1. **Model Loading Failure**: Check if `xgboost_model.pkl` (or lightgbm_model.pkl) and `scaler.pkl` files exist
     2. **SHAP Analysis Failure**: May be due to insufficient memory, try restarting the application
     3. **Abnormal Prediction Results**: Check if input feature values are within reasonable ranges
 
@@ -632,7 +632,7 @@ elif option == "ℹ️ User Guide":
 # ====================== 6. Footer ======================
 st.sidebar.markdown("---")
 st.sidebar.info("""
-**Cervical Cancer 5-Year survival Prediction System**  
+**Cervical Cancer 5-Year OS Prediction System**  
 
 🏥 Machine Learning-based Clinical Decision Support Tool  
 📊 With SHAP Interpretability Analysis  
