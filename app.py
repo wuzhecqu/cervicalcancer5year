@@ -23,7 +23,7 @@ st.set_page_config(
 st.title("🏥 Cervical Cancer 5-year OS Prediction System")
 st.markdown("""
 Cervical Cancer 5-year OS (Overall Survival) Prediction System Based on XGBoost, with SHAP interpretability analysis.
-6 key clinical factors are used for prediction, and the model achieves 94.2% accuracy on the validation set.
+6 key clinical factors are used for prediction.
 """)
 
 # Set 6 key features
@@ -642,5 +642,6 @@ st.sidebar.info("""
 # Add refresh button
 if st.sidebar.button("🔄 Refresh Application"):
     st.rerun()
+
 
 
