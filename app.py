@@ -210,8 +210,8 @@ if option == "🔍 Single Sample Prediction":
 
                 with col_result2:
                     # 修复5：明确是「死亡风险概率」或「生存概率」
-                    st.metric("5-Year Mortality Risk Probability", f"{probability:.2%}")
-                    st.metric("5-Year Survival Probability", f"{1-probability:.2%}")
+                    st.metric("5-Year Survival Risk Probability", f"{probability:.2%}")
+                    st.metric("5-Year Mortality Probability", f"{1-probability:.2%}")
 
                 with col_result3:
                     # Risk level
@@ -642,6 +642,7 @@ st.sidebar.info("""
 # Add refresh button
 if st.sidebar.button("🔄 Refresh Application"):
     st.rerun()
+
 
 
 
