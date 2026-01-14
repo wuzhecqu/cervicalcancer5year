@@ -231,7 +231,7 @@ if option == "🔍 Single Sample Prediction":
                     mode="gauge+number",
                     value=probability * 100,
                     domain={'x': [0, 1], 'y': [0, 1]},
-                    title={'text': "5-Year Mortality Risk (%)"},
+                    title={'text': "5-Year Survival Risk (%)"},
                     gauge={
                         'axis': {'range': [0, 100]},
                         'bar': {'color': "darkred"},
@@ -642,6 +642,7 @@ st.sidebar.info("""
 # Add refresh button
 if st.sidebar.button("🔄 Refresh Application"):
     st.rerun()
+
 
 
 
